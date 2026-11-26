@@ -1,60 +1,48 @@
-# Admin Workflow
+# Admin Dashboard and Workflow
 
-[Admin Data Models](admin-data-models.md) · [All Data Models](data-models.md)
+Admins use this dashboard to review reported listings, account issues, and booking disputes. Each report becomes a `Case` that tracks the issue, who is handling it, and how it was resolved.
 
-An `Admin` manages platform-wide issues such as flagged listings, user reports, and booking disputes. Admins also verify new hosts and reviewers before they can act.
+## Admin dashboard
 
-## Onboarding
+| Page section | What the admin sees | What the admin can do |
+| --- | --- | --- |
+| Case queue | Case type, date reported, status, and assigned admin | Filter cases by type or status and open a case |
+| Case details | Report reason, submitted details, linked records, and case history | Assign the case to themselves, review the details, or request more information |
+| Decision panel | Available actions for the case type | Resolve with no action, hide a listing, or cancel a disputed booking when appropriate. Every decision requires a reason. |
 
-1. Admins aren't self-service. A `SuperAdmin` invites them by email.
-2. The admin sets a password and must turn on multi-factor authentication before first sign-in.
-3. The admin accepts the data-handling and youth-safety policy.
-
-## Information the admin provides
-
-- Name, work email, and an MFA device
-- For every action: the decision and a written reason
-
-## Actions
-
-- Work the review queue: reports, disputes, safety concerns
-- Verify or reject new `Host` and `Reviewer` accounts
-- Approve new `Space` listings (`PendingApproval` → `Live`) or hide them
-- Cancel a booking, for example for a safety issue or a venue emergency
-- Pause, suspend, or reinstate accounts
-- Adjust limits, such as a reviewer's maximum initiatives
-
-## Rules and permissions
-
-- Only `Admin` and `SuperAdmin` roles can open the queue.
-- Admins can't act on a case they reported or one involving their own initiative.
-- Every action needs a reason and creates an `AuditEntry`. Audit entries can't be edited.
-- Safety concerns involving minors go to the top of the queue and must be picked up within 24 hours.
-- Admins see personal data only for records linked to an open case.
+## How the workflow works
 
 ```mermaid
 flowchart TD
-    A["Admin opens review queue"]
-    B["Admin reviews the case and linked records"]
-    C{"Action needed?"}
-    D["Close case with no action"]
-    E["Apply action and notify affected users"]
-    F["Record the decision and close the case"]
-
-    A --> B --> C
-    C -->|No| D --> F
-    C -->|Yes| E --> F
+    A["User submits a report"] --> B["Case enters the queue as Open"]
+    B --> C["Admin takes the case and reviews it"]
+    C --> D{"Enough information?"}
+    D -->|No| E["Request details and mark WaitingForInfo"]
+    E -->|User responds| C
+    D -->|Yes| F{"Platform action needed?"}
+    F -->|Yes| G["Update the listing or booking"]
+    F -->|No| H["Choose NoAction"]
+    G --> I["Record the decision and resolve the case"]
+    H --> I
+    I --> J["Send the outcome to the relevant users"]
 ```
+
+1. **Receive a report.** A host or nonprofit submits a report. The app creates an `Open` case and links it to the listing, booking, or account involved.
+2. **Take the case.** An admin assigns the case to themselves and moves it to `InReview`. The case page shows what was reported and the current state of the linked records.
+3. **Ask for details if needed.** The admin sends a question and moves the case to `WaitingForInfo`. When the user responds, the case returns to `InReview`.
+4. **Make a decision.** If the case needs action, the admin updates the relevant record. For example, hiding a listing removes it from search and prevents new requests. If no action is needed, the admin selects `NoAction`.
+5. **Resolve the case.** The app records the decision, reason, admin ID, and timestamp. It marks the case `Resolved` and sends the relevant users a summary of the outcome.
 
 ## Data used at each step
 
-| Step | Data used | Data saved or updated |
+| Step | Data read | Data saved or updated |
 | --- | --- | --- |
-| Open review queue | Signed-in user's admin role and open cases | None |
-| Review case | Report reason, submitted details, and linked `Host`, `Space`, `Student`, `Initiative`, `Reviewer`, or `Booking` records | Set case status to `InReview` |
-| Apply action | Case details and the admin's decision | Update the relevant record when needed, such as hiding a listing or suspending an account |
-| Close case | Case ID, admin ID, action taken, and decision reason | Set case status to `Resolved` and save an audit entry with the decision and timestamp |
+| Receive report | Reporter ID, report type, description, and linked record IDs | Create a `Case` with status `Open` |
+| Review case | Admin role, report details, case history, and linked records | Save `assignedAdminId` and set status to `InReview` |
+| Request more details | Case ID and the recipient's user ID | Save the question and set status to `WaitingForInfo` |
+| Make a decision | Case details, current listing or booking status, and decision reason | Update the linked record when the decision requires it |
+| Resolve case | Case ID, admin ID, decision, and reason | Set status to `Resolved`, save an `AuditEntry`, and send an outcome notification |
 
-## Case statuses
+## Example
 
-`Open` → `InReview` → `Resolved`
+A teen nonprofit reports that a listing says it holds 50 people, but the host confirms the room only holds 25. An admin reviews the report, hides the listing, and records the reason. The host gets a message explaining what to correct, and the nonprofit gets an update that the report was resolved.
